@@ -5,7 +5,7 @@
 
 We are SILARHI, a French company from Toulouse, France. We love developing PHP based Web applications for our fellows!
 
-## ⚡ Active & maintained OSS projects / websites
+## ⚡ Active & maintained OSS projects
 * [docker-php](https://github.com/silarhi/docker-php)
 * [symfony-docker-ci](https://github.com/silarhi/symfony-docker-ci)
 * [ebics-client-php](https://github.com/andrew-svirin/ebics-client-php)
