@@ -18,5 +18,5 @@ We are SILARHI, a French company from Toulouse, France. We love developing PHP b
 - [Gérer ses miniatures avec Symfony et Glide](https://blog.silarhi.fr/symfony-miniature-image-glide-php/)
 - [Devenir Freelance Web : De l'idée à la création d'entreprise - Les aides](https://blog.silarhi.fr/devenir-freelance-web-partie-1/)
 - [Le déploiement automatique en production pour Symfony 5 avec Docker et CircleCI](https://blog.silarhi.fr/deploiement-continu-symfony-docker-circleci/)
-- [Adieu jQuery ? Bootstrap 5 annonce la tendance, retour d'expérience](https://blog.silarhi.fr/adieu-jquery-bootstrap-5-tendance/)
+- [Coder sans jQuery ? Retour d'expérience](https://blog.silarhi.fr/adieu-jquery-bootstrap-5-tendance/)
 <!-- BLOG-POST-LIST:END -->
