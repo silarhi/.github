@@ -10,6 +10,7 @@ We are SILARHI, a French company from Toulouse, France. We love developing PHP b
 * [symfony-docker-ci](https://github.com/silarhi/symfony-docker-ci)
 * [ebics-client-php](https://github.com/andrew-svirin/ebics-client-php)
 * [cfonb-parser](https://github.com/silarhi/cfonb-parser)
+* [caf-parser](https://github.com/silarhi/caf-parser)
 
 
 ## 📕 Latest Blog Posts
