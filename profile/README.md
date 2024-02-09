@@ -6,11 +6,12 @@
 We are SILARHI, a French company from Toulouse, France. We love developing PHP based Web applications for our fellows!
 
 ## ⚡ Active & maintained OSS projects
+* [cursor-pagination](https://github.com/silarhi/cursor-pagination)
+* [cfonb-parser](https://github.com/silarhi/cfonb-parser)
+* [caf-parser](https://github.com/silarhi/caf-parser)
 * [docker-php](https://github.com/silarhi/docker-php)
 * [symfony-docker-ci](https://github.com/silarhi/symfony-docker-ci)
 * [ebics-client-php](https://github.com/andrew-svirin/ebics-client-php)
-* [cfonb-parser](https://github.com/silarhi/cfonb-parser)
-* [caf-parser](https://github.com/silarhi/caf-parser)
 
 
 ## 📕 Latest Blog Posts
