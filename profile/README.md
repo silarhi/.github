@@ -6,6 +6,7 @@
 We are SILARHI, a French company from Toulouse, France. We love developing PHP based Web applications for our fellows!
 
 ## ⚡ Active & maintained OSS projects
+* [picasso-bundle](https://github.com/silarhi/picasso-bundle)
 * [cursor-pagination](https://github.com/silarhi/cursor-pagination)
 * [cfonb-parser](https://github.com/silarhi/cfonb-parser)
 * [caf-parser](https://github.com/silarhi/caf-parser)
