@@ -1,0 +1,113 @@
+name: 'Coverage Report'
+
+# Reusable workflow: turns the PHPUnit Clover reports uploaded by the caller's
+# "QA Checks" jobs (artifacts named clover-<php version>) into a job summary and,
+# on pull requests, one sticky comment with the coverage delta against the base
+# branch (taken from the latest successful run of the same workflow there).
+#
+#     coverage:
+#         name: Coverage
+#         needs: [qa]
+#         if: always()
+#         permissions:
+#             actions: read
+#             contents: read
+#             pull-requests: write
+#         uses: silarhi/.github/.github/workflows/coverage-report.yml@main
+
+on:
+    workflow_call:
+        inputs:
+            workflow:
+                description: 'Workflow file whose base-branch run provides the reference coverage'
+                type: string
+                default: 'continuous-integration.yml'
+
+jobs:
+    report:
+        name: Report
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: read
+            pull-requests: write
+        env:
+            GH_TOKEN: ${{ github.token }}
+            REPO: ${{ github.repository }}
+        steps:
+            - name: Download coverage
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: clover-*
+                  path: current
+
+            - name: Download base branch coverage
+              if: github.event_name == 'pull_request'
+              run: |
+                  run=$(gh run list -R "$REPO" --workflow '${{ inputs.workflow }}' --branch '${{ github.base_ref }}' \
+                      --status success --limit 1 --json databaseId -q '.[0].databaseId')
+                  if [ -n "$run" ]; then gh run download "$run" -R "$REPO" -p 'clover-*' -D base || true; fi
+
+            - name: Build report
+              run: |
+                  python3 - <<'EOF'
+                  import glob, os, xml.etree.ElementTree as ET
+
+                  def load(directory):
+                      """Metrics of the Clover report from the highest PHP version, or (None, None)."""
+                      php = lambda p: tuple(int(x) for x in p.split("clover-")[-1].split("/")[0].split("."))
+                      for report in sorted(glob.glob(f"{directory}/clover-*/clover.xml"), key=php, reverse=True):
+                          try:
+                              root = ET.parse(report).getroot()
+                              break
+                          except ET.ParseError:  # truncated report from an interrupted run
+                              continue
+                      else:
+                          return None, None
+                      metrics = lambda m: (int(m.get("coveredstatements")), int(m.get("statements")))
+                      files = {f.get("name").split("/github/workspace/", 1)[-1]: metrics(f.find("metrics")) for f in root.iter("file")}
+                      files["_total"] = metrics(root.find("project/metrics"))
+                      return files, ".".join(map(str, php(report)))
+
+                  pct = lambda c, s: 100.0 * c / s if s else 100.0
+                  fmt = lambda c, s: f"{pct(c, s):.2f}% ({c}/{s})"
+
+                  def delta(now, before):
+                      if before is None:
+                          return ""
+                      d = pct(*now) - pct(*before)
+                      return "±0.00%" if abs(d) < 0.005 else f"{'+' if d > 0 else ''}{d:.2f}%"
+
+                  current, php = load("current")
+                  base, _ = load("base")
+                  if current is None:
+                      body = "## Coverage\n\nNo Clover report was produced (the PHPUnit jobs failed or were skipped).\n"
+                  else:
+                      total, base_total = current["_total"], (base or {}).get("_total")
+                      vs = f" **{delta(total, base_total)}** vs `{os.environ.get('GITHUB_BASE_REF')}`" if base_total else ""
+                      files = sorted((name, m) for name, m in current.items() if name != "_total")
+                      row = lambda name, m: f"| `{name}` | {fmt(*m)} | {delta(m, base.get(name)) if base else ''} |"
+                      rows = [row(name, m) for name, m in files]
+                      changed = [row(name, m) for name, m in files if base and base.get(name) != m]
+                      body = f"## Coverage: {fmt(*total)}{vs}\n\n"
+                      if changed:
+                          body += "Files whose coverage changed:\n\n| File | Lines | Δ |\n|---|---|---|\n" + "\n".join(changed) + "\n\n"
+                      body += ("<details><summary>All files</summary>\n\n| File | Lines | Δ |\n|---|---|---|\n"
+                               + "\n".join(rows) + "\n\n</details>\n\n")
+                      body += f"<sub>Line coverage from PHPUnit (PHP {php}, latest dependencies).</sub>\n"
+                  open("report.md", "w").write("<!-- coverage-report -->\n" + body)
+                  open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(body)
+                  EOF
+
+            - name: Comment on the pull request
+              # Pull requests from forks get a read-only token: the job summary is enough there.
+              if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+              run: |
+                  pr=${{ github.event.pull_request.number }}
+                  id=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
+                      -q '.[] | select(.body | startswith("<!-- coverage-report -->")) | .id' | head -1)
+                  if [ -n "$id" ]; then
+                      gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@report.md > /dev/null
+                  else
+                      gh api "repos/$REPO/issues/$pr/comments" -F body=@report.md > /dev/null
+                  fi
