@@ -11,7 +11,7 @@ name: 'Coverage Report'
 #         if: always()
 #         permissions:
 #             actions: read
-#             contents: read
+#             contents: write
 #             pull-requests: write
 #         uses: silarhi/.github/.github/workflows/coverage-report.yml@main
 
@@ -29,7 +29,7 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             actions: read
-            contents: read
+            contents: write
             pull-requests: write
         env:
             GH_TOKEN: ${{ github.token }}
@@ -51,7 +51,7 @@ jobs:
             - name: Build report
               run: |
                   python3 - <<'EOF'
-                  import glob, os, xml.etree.ElementTree as ET
+                  import glob, json, os, xml.etree.ElementTree as ET
 
                   def load(directory):
                       """Metrics of the Clover report from the highest PHP version, or (None, None)."""
@@ -95,9 +95,24 @@ jobs:
                       body += ("<details><summary>All files</summary>\n\n| File | Lines | Δ |\n|---|---|---|\n"
                                + "\n".join(rows) + "\n\n</details>\n\n")
                       body += f"<sub>Line coverage from PHPUnit (PHP {php}, latest dependencies).</sub>\n"
+                      percent = pct(*total)
+                      color = next(c for limit, c in ((90, "brightgreen"), (80, "green"), (70, "yellowgreen"), (60, "yellow"), (50, "orange"), (0, "red")) if percent >= limit)
+                      open("badge.json", "w").write(json.dumps({"schemaVersion": 1, "label": "coverage", "message": f"{percent:.1f}%", "color": color}))
                   open("report.md", "w").write("<!-- coverage-report -->\n" + body)
                   open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(body)
                   EOF
+
+            - name: Publish coverage badge
+              # Force-pushes a one-commit "badges" branch holding a shields.io endpoint file, read by the README badge:
+              # https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/badges/coverage.json
+              if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && hashFiles('badge.json') != ''
+              run: |
+                  mkdir badges && mv badge.json badges/coverage.json && cd badges
+                  git init -q -b badges
+                  git add coverage.json
+                  git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                      commit -q -m "Coverage badge for ${GITHUB_SHA::7}"
+                  git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:badges
 
             - name: Comment on the pull request
               # Pull requests from forks get a read-only token: the job summary is enough there.
