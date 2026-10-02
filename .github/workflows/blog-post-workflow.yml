@@ -5,10 +5,15 @@ on:
         - cron: '0 9 * * *' # every day at 09:00 UTC
     workflow_dispatch: # run manually from the Actions tab
 
+permissions:
+    contents: read
+
 jobs:
     update-readme-with-blog:
         name: Update this repo's README with latest blog posts
         runs-on: ubuntu-latest
+        permissions:
+            contents: write # commits the refreshed profile/README.md
         steps:
             - uses: actions/checkout@v7
             - uses: gautamkrishnar/blog-post-workflow@master
