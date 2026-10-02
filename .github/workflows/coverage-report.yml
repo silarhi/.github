@@ -46,8 +46,10 @@ jobs:
 
             - name: Download base branch coverage
               if: github.event_name == 'pull_request'
+              env:
+                  WORKFLOW: ${{ inputs.workflow }}
               run: |
-                  run=$(gh run list -R "$REPO" --workflow '${{ inputs.workflow }}' --branch '${{ github.base_ref }}' \
+                  run=$(gh run list -R "$REPO" --workflow "$WORKFLOW" --branch "$GITHUB_BASE_REF" \
                       --status success --limit 1 --json databaseId -q '.[0].databaseId')
                   if [ -n "$run" ]; then gh run download "$run" -R "$REPO" -p 'clover-*' -D base || true; fi
 
