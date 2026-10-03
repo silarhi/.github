@@ -17,9 +17,9 @@ We are SILARHI, a French company from Toulouse, France. We love developing PHP b
 
 ## 📕 Latest Blog Posts
 <!-- BLOG-POST-LIST:START -->
+- [PicassoBundle : le composant image qui manquait à Symfony](https://blog.silarhi.fr/presentation-picasso-bundle-symfony-image/)
 - [L&#39;authentification à double facteur avec Symfony &lpar;2FA&rpar;](https://blog.silarhi.fr/symfony-double-authentification-2fa/)
 - [Gérer ses miniatures avec Symfony et Glide](https://blog.silarhi.fr/symfony-miniature-image-glide-php/)
 - [Devenir Freelance Web : De l&#39;idée à la création d&#39;entreprise - Les aides](https://blog.silarhi.fr/devenir-freelance-web-partie-1/)
-- [Le déploiement continu en production pour Symfony 7 avec Docker et CircleCI](https://blog.silarhi.fr/deploiement-continu-symfony-docker-circleci/)
-- [Coder sans jQuery ? Retour d&#39;expérience](https://blog.silarhi.fr/adieu-jquery-bootstrap-5-tendance/)
+- [Le déploiement continu en production pour Symfony 8 avec Docker et CircleCI](https://blog.silarhi.fr/deploiement-continu-symfony-docker-circleci/)
 <!-- BLOG-POST-LIST:END -->
