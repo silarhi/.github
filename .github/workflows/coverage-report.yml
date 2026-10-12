@@ -1,9 +1,10 @@
 name: 'Coverage Report'
 
 # Reusable workflow: turns the PHPUnit Clover reports uploaded by the caller's
-# "QA Checks" jobs (artifacts named clover-<php version>) into a job summary and,
-# on pull requests, one sticky comment with the coverage delta against the base
-# branch (taken from the latest successful run of the same workflow there).
+# "QA Checks" jobs (artifacts named clover-<php version>) into a job summary with,
+# on pull requests, the coverage delta against the base branch (taken from the
+# latest successful run of the same workflow there). No PR comment is posted, so
+# no notification email is sent: the report lives on the workflow run page.
 #
 #     coverage:
 #         name: Coverage
@@ -12,7 +13,6 @@ name: 'Coverage Report'
 #         permissions:
 #             actions: read
 #             contents: write
-#             pull-requests: write
 #         uses: silarhi/.github/.github/workflows/coverage-report.yml@main
 
 on:
@@ -34,7 +34,6 @@ jobs:
         permissions:
             actions: read
             contents: write
-            pull-requests: write
         env:
             GH_TOKEN: ${{ github.token }}
             REPO: ${{ github.repository }}
@@ -104,7 +103,6 @@ jobs:
                       percent = pct(*total)
                       color = next(c for limit, c in ((90, "brightgreen"), (80, "green"), (70, "yellowgreen"), (60, "yellow"), (50, "orange"), (0, "red")) if percent >= limit)
                       open("badge.json", "w").write(json.dumps({"schemaVersion": 1, "label": "coverage", "message": f"{percent:.1f}%", "color": color}))
-                  open("report.md", "w").write("<!-- coverage-report -->\n" + body)
                   open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(body)
                   EOF
 
@@ -119,16 +117,3 @@ jobs:
                   git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
                       commit -q -m "Coverage badge for ${GITHUB_SHA::7}"
                   git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:badges
-
-            - name: Comment on the pull request
-              # Pull requests from forks get a read-only token: the job summary is enough there.
-              if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-              run: |
-                  pr=${{ github.event.pull_request.number }}
-                  id=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
-                      -q '.[] | select(.body | startswith("<!-- coverage-report -->")) | .id' | head -1)
-                  if [ -n "$id" ]; then
-                      gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@report.md > /dev/null
-                  else
-                      gh api "repos/$REPO/issues/$pr/comments" -F body=@report.md > /dev/null
-                  fi
