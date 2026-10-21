@@ -36,9 +36,9 @@ We also contribute to [ebics-client-php](https://github.com/andrew-svirin/ebics-
 
 ## 📕 Latest Blog Posts
 <!-- BLOG-POST-LIST:START -->
+- [UX Icons JS : les icônes de Symfony UX, enfin en JavaScript, React et Vue](https://blog.silarhi.fr/symfony-ux-icons-javascript-react-vue/)
 - [PicassoBundle : le composant image qui manquait à Symfony](https://blog.silarhi.fr/presentation-picasso-bundle-symfony-image/)
 - [L&#39;authentification à double facteur avec Symfony &lpar;2FA&rpar;](https://blog.silarhi.fr/symfony-double-authentification-2fa/)
 - [Gérer ses miniatures avec Symfony et Glide](https://blog.silarhi.fr/symfony-miniature-image-glide-php/)
 - [Devenir Freelance Web : De l&#39;idée à la création d&#39;entreprise - Les aides](https://blog.silarhi.fr/devenir-freelance-web-partie-1/)
-- [Le déploiement continu en production pour Symfony 8 avec Docker et CircleCI](https://blog.silarhi.fr/deploiement-continu-symfony-docker-circleci/)
 <!-- BLOG-POST-LIST:END -->
