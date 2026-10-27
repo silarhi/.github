@@ -17,7 +17,7 @@ jobs:
             contents: write # commits the refreshed profile/README.md
         steps:
             - uses: actions/checkout@v7
-            - uses: gautamkrishnar/blog-post-workflow@master
+            - uses: gautamkrishnar/blog-post-workflow@v1
               with:
                   feed_list: 'https://blog.silarhi.fr/rss'
                   readme_path: './profile/README.md'
