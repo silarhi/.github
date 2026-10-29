@@ -1,19 +1,24 @@
 name: 'Coverage Report'
 
-# Reusable workflow: turns the PHPUnit Clover reports uploaded by the caller's
-# "QA Checks" jobs (artifacts named clover-<php version>) into a job summary with,
-# on pull requests, the coverage delta against the base branch (taken from the
-# latest successful run of the same workflow there). No PR comment is posted, so
-# no notification email is sent: the report lives on the workflow run page.
+# Reusable workflow: turns the Clover reports uploaded by the caller's jobs into a job summary with, on pull requests,
+# the coverage delta against the base branch (taken from the latest successful run of the same workflow there). No PR
+# comment is posted, so no notification email is sent: the report lives on the workflow run page.
+#
+# - PHP: the PHPUnit reports of the "QA Checks" jobs, artifacts named clover-<php version> (the highest version wins).
+# - JavaScript: the Vitest report, an artifact named js-coverage holding clover.xml (@vitest/coverage-v8 with the
+#   "clover" reporter). Optional: a repository without it gets the PHP report only, and the other way round.
 #
 #     coverage:
 #         name: Coverage
-#         needs: [qa]
+#         needs: [qa, test]
 #         if: always()
 #         permissions:
 #             actions: read
 #             contents: write
 #         uses: silarhi/.github/.github/workflows/coverage-report.yml@main
+#
+# On the default branch, the line coverage is published as shields.io endpoint files on a "badges" branch:
+# coverage.json (PHP) and coverage-js.json (JavaScript).
 
 on:
     workflow_call:
@@ -38,10 +43,16 @@ jobs:
             GH_TOKEN: ${{ github.token }}
             REPO: ${{ github.repository }}
         steps:
-            - name: Download coverage
+            - name: Download PHP coverage
               uses: actions/download-artifact@v8
               with:
                   pattern: clover-*
+                  path: current
+
+            - name: Download JavaScript coverage
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: js-coverage
                   path: current
 
             - name: Download base branch coverage
@@ -51,28 +62,36 @@ jobs:
               run: |
                   run=$(gh run list -R "$REPO" --workflow "$WORKFLOW" --branch "$GITHUB_BASE_REF" \
                       --status success --limit 1 --json databaseId -q '.[0].databaseId')
-                  if [ -n "$run" ]; then gh run download "$run" -R "$REPO" -p 'clover-*' -D base || true; fi
+                  if [ -n "$run" ]; then gh run download "$run" -R "$REPO" -p 'clover-*' -p 'js-coverage' -D base || true; fi
 
             - name: Build report
               run: |
                   python3 - <<'EOF'
                   import glob, json, os, xml.etree.ElementTree as ET
 
-                  def load(directory):
-                      """Metrics of the Clover report from the highest PHP version, or (None, None)."""
+                  def parse(report):
+                      """Line metrics per file of a Clover report, relative to the repository, or None."""
+                      try:
+                          root = ET.parse(report).getroot()
+                      except (OSError, ET.ParseError):  # missing, or truncated by an interrupted run
+                          return None
+                      workspace = os.environ["GITHUB_WORKSPACE"] + "/"
+                      metrics = lambda m: (int(m.get("coveredstatements")), int(m.get("statements")))
+                      # PHPUnit names files by their path in the Laminas container, Istanbul (Vitest) by their basename
+                      # with the path in "path"
+                      relative = lambda f: (f.get("path") or f.get("name")).split("/github/workspace/", 1)[-1].removeprefix(workspace)
+                      files = {relative(f): metrics(f.find("metrics")) for f in root.iter("file")}
+                      files["_total"] = metrics(root.find("project/metrics"))
+                      return files
+
+                  def load_php(directory):
+                      """Metrics of the PHPUnit report from the highest PHP version, and that version."""
                       php = lambda p: tuple(int(x) for x in p.split("clover-")[-1].split("/")[0].split("."))
                       for report in sorted(glob.glob(f"{directory}/clover-*/clover.xml"), key=php, reverse=True):
-                          try:
-                              root = ET.parse(report).getroot()
-                              break
-                          except ET.ParseError:  # truncated report from an interrupted run
-                              continue
-                      else:
-                          return None, None
-                      metrics = lambda m: (int(m.get("coveredstatements")), int(m.get("statements")))
-                      files = {f.get("name").split("/github/workspace/", 1)[-1]: metrics(f.find("metrics")) for f in root.iter("file")}
-                      files["_total"] = metrics(root.find("project/metrics"))
-                      return files, ".".join(map(str, php(report)))
+                          files = parse(report)
+                          if files is not None:
+                              return files, ".".join(map(str, php(report)))
+                      return None, None
 
                   pct = lambda c, s: 100.0 * c / s if s else 100.0
                   fmt = lambda c, s: f"{pct(c, s):.2f}% ({c}/{s})"
@@ -83,37 +102,50 @@ jobs:
                       d = pct(*now) - pct(*before)
                       return "±0.00%" if abs(d) < 0.005 else f"{'+' if d > 0 else ''}{d:.2f}%"
 
-                  current, php = load("current")
-                  base, _ = load("base")
-                  if current is None:
-                      body = "## Coverage\n\nNo Clover report was produced (the PHPUnit jobs failed or were skipped).\n"
-                  else:
+                  def section(title, current, base, source):
                       total, base_total = current["_total"], (base or {}).get("_total")
                       vs = f" **{delta(total, base_total)}** vs `{os.environ.get('GITHUB_BASE_REF')}`" if base_total else ""
                       files = sorted((name, m) for name, m in current.items() if name != "_total")
                       row = lambda name, m: f"| `{name}` | {fmt(*m)} | {delta(m, base.get(name)) if base else ''} |"
                       rows = [row(name, m) for name, m in files]
                       changed = [row(name, m) for name, m in files if base and base.get(name) != m]
-                      body = f"## Coverage: {fmt(*total)}{vs}\n\n"
+                      body = f"## {title}: {fmt(*total)}{vs}\n\n"
                       if changed:
                           body += "Files whose coverage changed:\n\n| File | Lines | Δ |\n|---|---|---|\n" + "\n".join(changed) + "\n\n"
                       body += ("<details><summary>All files</summary>\n\n| File | Lines | Δ |\n|---|---|---|\n"
                                + "\n".join(rows) + "\n\n</details>\n\n")
-                      body += f"<sub>Line coverage from PHPUnit (PHP {php}, latest dependencies).</sub>\n"
-                      percent = pct(*total)
+                      return body + f"<sub>Line coverage from {source}.</sub>\n\n"
+
+                  def badge(name, label, files):
+                      percent = pct(*files["_total"])
                       color = next(c for limit, c in ((90, "brightgreen"), (80, "green"), (70, "yellowgreen"), (60, "yellow"), (50, "orange"), (0, "red")) if percent >= limit)
-                      open("badge.json", "w").write(json.dumps({"schemaVersion": 1, "label": "coverage", "message": f"{percent:.1f}%", "color": color}))
+                      os.makedirs("badges", exist_ok=True)
+                      open(f"badges/{name}", "w").write(json.dumps({"schemaVersion": 1, "label": label, "message": f"{percent:.1f}%", "color": color}))
+
+                  php, version = load_php("current")
+                  php_base, _ = load_php("base")
+                  js, js_base = parse("current/js-coverage/clover.xml"), parse("base/js-coverage/clover.xml")
+
+                  body = ""
+                  if php is not None:
+                      body += section("PHP coverage", php, php_base, f"PHPUnit (PHP {version}, latest dependencies)")
+                      badge("coverage.json", "coverage", php)
+                  if js is not None:
+                      body += section("JavaScript coverage", js, js_base, "Vitest")
+                      badge("coverage-js.json", "js coverage", js)
+                  if not body:
+                      body = "## Coverage\n\nNo Clover report was produced (the test jobs failed or were skipped).\n"
                   open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(body)
                   EOF
 
-            - name: Publish coverage badge
-              # Force-pushes a one-commit "badges" branch holding a shields.io endpoint file, read by the README badge:
+            - name: Publish coverage badges
+              # Force-pushes a one-commit "badges" branch holding shields.io endpoint files, read by the README badges:
               # https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/badges/coverage.json
-              if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && hashFiles('badge.json') != ''
+              if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && hashFiles('badges/*.json') != ''
               run: |
-                  mkdir badges && mv badge.json badges/coverage.json && cd badges
+                  cd badges
                   git init -q -b badges
-                  git add coverage.json
+                  git add .
                   git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-                      commit -q -m "Coverage badge for ${GITHUB_SHA::7}"
+                      commit -q -m "Coverage badges for ${GITHUB_SHA::7}"
                   git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:badges
