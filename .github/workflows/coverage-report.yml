@@ -52,8 +52,10 @@ jobs:
             - name: Download JavaScript coverage
               uses: actions/download-artifact@v8
               with:
+                  # A pattern matching a single artifact extracts it into "path" itself, not into a subdirectory named
+                  # after it, so the subdirectory is given here. The pattern (unlike "name") keeps the report optional.
                   pattern: js-coverage
-                  path: current
+                  path: current/js-coverage
 
             - name: Download base branch coverage
               if: github.event_name == 'pull_request'
